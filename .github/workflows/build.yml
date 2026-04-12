@@ -7,95 +7,15 @@ on:
     branches: [master]
 
 env:
-  MESON_ARGS: >-
-    --auto-features=enabled
-    --fatal-meson-warnings
-    -Danticheat-server=true
-    -Davcodec=disabled
-    -Dclient-gtv=true
-    -Dpacketdup-hack=true
-    -Dtests=true
-    -Dvariable-fps=true
-    -Dwerror=true
-
-  MESON_ARGS_WIN: >-
-    -Dsdl2=disabled
-    -Dwayland=disabled
-    -Dwrap_mode=forcefallback
-    -Dx11=disabled
-
-  MESON_ARGS_LINUX: >-
-    -Dwindows-crash-dumps=disabled
-    -Dwrap_mode=nofallback
-
-  MESON_ARGS_MACOS: >-
-    -Dbuildtype=release
-    -Dicmp-errors=disabled
-    -Dpkg_config_path=/opt/homebrew/opt/openal-soft/lib/pkgconfig
-    -Dwayland=disabled
-    -Dwindows-crash-dumps=disabled
-    -Dwrap_mode=nofallback
-    -Dx11=disabled
-
-  MESON_ARGS_FREEBSD: >-
-    -Dbuildtype=release
-    -Dc_std=c23
-    -Dicmp-errors=disabled
-    -Dwindows-crash-dumps=disabled
-    -Dwrap_mode=nofallback
+  CMAKE_COMMON_ARGS: >-
+    -DQ2PRO_ANTICHEAT_SERVER=ON
+    -DQ2PRO_USE_AVCODEC=OFF
+    -DQ2PRO_CLIENT_GTV=ON
+    -DQ2PRO_PACKETDUP_HACK=ON
+    -DQ2PRO_TESTS=ON
+    -DQ2PRO_VARIABLE_FPS=ON
 
 jobs:
-  mingw:
-    runs-on: ubuntu-24.04
-    strategy:
-      matrix:
-        arch: ["i686", "x86_64"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/cache@v4
-        with:
-          path: subprojects/packagecache
-          key: ${{ hashFiles('subprojects/*.wrap') }}
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64 nasm meson ninja-build
-
-      - name: Build
-        run: |
-          meson setup --cross-file=.ci/${{ matrix.arch }}-w64-mingw32.txt \
-          ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_WIN }} builddir
-          meson compile -C builddir
-
-  msvc:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: ["x86", "x64"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/cache@v4
-        with:
-          path: subprojects/packagecache
-          key: ${{ hashFiles('subprojects/*.wrap') }}
-
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: ${{ matrix.arch }}
-
-      - uses: ilammy/setup-nasm@v1
-
-      - name: Install dependencies
-        run: pip3 install --no-input meson ninja
-
-      - name: Build
-        run: |
-          meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_WIN }} builddir
-          meson compile -C builddir
-
   linux:
     runs-on: ubuntu-latest
     strategy:
@@ -107,17 +27,20 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y meson libsdl2-dev libopenal-dev \
+          sudo apt-get install -y cmake ninja-build libsdl2-dev libopenal-dev \
           libpng-dev libjpeg-dev zlib1g-dev mesa-common-dev \
           libcurl4-gnutls-dev libx11-dev libxi-dev \
           libwayland-dev wayland-protocols libdecor-0-dev
 
-      - name: Build
+      - name: Configure
         run: |
-          meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_LINUX }} builddir
-          meson compile -C builddir
-        env:
-          CC: ${{ matrix.cc }}
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            ${{ env.CMAKE_COMMON_ARGS }}
+
+      - name: Build
+        run: cmake --build build
 
   macos:
     runs-on: macos-latest
@@ -127,12 +50,20 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install meson sdl2 openal-soft libpng jpeg-turbo
+          brew install cmake ninja sdl2 openal-soft libpng jpeg-turbo
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQ2PRO_ICMP_ERRORS=OFF \
+            -DQ2PRO_USE_WAYLAND=OFF \
+            -DQ2PRO_USE_X11=OFF \
+            -DCMAKE_PREFIX_PATH="/opt/homebrew/opt/openal-soft" \
+            ${{ env.CMAKE_COMMON_ARGS }}
 
       - name: Build
-        run: |
-          meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_MACOS }} builddir
-          meson compile -C builddir
+        run: cmake --build build
 
   freebsd:
     runs-on: ubuntu-latest
@@ -148,7 +79,10 @@ jobs:
           version: '14.2'
           run: |
             sudo pkg update
-            sudo pkg install -y git meson pkgconf openal-soft \
+            sudo pkg install -y git cmake ninja pkgconf openal-soft \
             sdl2 curl png jpeg-turbo libx11 libdecor evdev-proto wayland-protocols
-            meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_FREEBSD }} builddir
-            meson compile -C builddir
+            cmake -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DQ2PRO_ICMP_ERRORS=OFF \
+              ${{ env.CMAKE_COMMON_ARGS }}
+            cmake --build build

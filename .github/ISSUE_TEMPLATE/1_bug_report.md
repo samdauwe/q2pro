@@ -53,5 +53,5 @@ Linux, backtrace can be created by launching Q2PRO with `gdb q2pro --args
 
 ### Compilation issues
 
-If reporting a building / compilation issue, provide `meson setup` command
+If reporting a building / compilation issue, provide `cmake -B build` command
 line and full console output.

@@ -25,7 +25,7 @@ strongly recommended).
 To install the *full* set of dependencies for building Q2PRO on Debian or
 Ubuntu use the following command:
 
-    apt-get install meson gcc libc6-dev libsdl2-dev libopenal-dev \
+    apt-get install cmake ninja-build gcc libc6-dev libsdl2-dev libopenal-dev \
                     libpng-dev libjpeg-dev zlib1g-dev mesa-common-dev \
                     libcurl4-gnutls-dev libx11-dev libxi-dev \
                     libwayland-dev wayland-protocols libdecor-0-dev \
@@ -35,37 +35,35 @@ Ubuntu use the following command:
 If you intend to build just dedicated server, smaller set of dependencies can
 be installed:
 
-    apt-get install meson gcc libc6-dev zlib1g-dev
-
-Users of other distributions should look for equivalent development packages
-and install them.
+    apt-get install cmake ninja-build gcc libc6-dev zlib1g-dev
 
 
 Building
 --------
 
-Q2PRO uses Meson build system for its build process.
+Q2PRO uses CMake for its build process.
 
-Setup build directory (arbitrary name can be used instead of `builddir`):
+Configure the build (Ninja is recommended but not required):
 
-    meson setup builddir
+    cmake -B build -G Ninja
 
-Review and configure options:
+To review and change options, use `ccmake` or pass `-D` flags on the command
+line. Project-specific options are prefixed with `Q2PRO_`. For example, to
+change the install prefix:
 
-    meson configure builddir
+    cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr
 
-Q2PRO specific options are listed in `Project options` section. They are
-defined in `meson_options.txt` file.
+Optional dependencies can be toggled with `AUTO` (default), `ON`, or `OFF`:
 
-E.g. to install to different prefix:
+    cmake -B build -G Ninja -DQ2PRO_USE_AVCODEC=ON -DQ2PRO_USE_SDL2=OFF
 
-    meson configure -Dprefix=/usr builddir
+Build:
 
-Finally, invoke build command:
+    cmake --build build
 
-    meson compile -C builddir
+To enable verbose output during the build:
 
-To enable verbose output during the build, use `meson compile -C builddir -v`.
+    cmake --build build --verbose
 
 
 Installation
@@ -74,14 +72,14 @@ Installation
 You need to have either full version of Quake 2 unpacked somewhere, or a demo.
 Both should be patched to 3.20 point release.
 
-Run `sudo ninja -C builddir install` to install Q2PRO system-wide into
+Run `sudo cmake --install build` to install Q2PRO system-wide into the
 configured prefix (`/usr/local` by default).
 
 Copy `baseq2/pak*.pak` files and `baseq2/players` directory from unpacked
 Quake 2 data into `/usr/local/share/q2pro/baseq2` to complete the
 installation.
 
-Alternatively, configure with `-Dsystem-wide=false` to build a ‘portable’
+Alternatively, configure with `-DQ2PRO_SYSTEM_WIDE=OFF` to build a 'portable'
 version that expects to be launched from the root of Quake 2 data tree (this
 is default when building for Windows).
 
@@ -109,51 +107,43 @@ MinGW-w64
 MinGW-w64 cross-compiler is available in recent versions of all major Linux
 distributions.
 
-Library dependencies that Q2PRO uses have been prepared as Meson subprojects
-and will be automatically downloaded and built by Meson.
-
 To install MinGW-w64 on Debian or Ubuntu, use the following command:
 
-    apt-get install mingw-w64
+    apt-get install cmake ninja-build mingw-w64
 
 It is recommended to also install nasm, which is needed to build libjpeg-turbo
 with SIMD support:
 
     apt-get install nasm
 
-Meson needs correct cross build definition file for compilation. Example
-cross-files can be found in `.ci` subdirectory (available in git
-repository, but not source tarball). Note that these cross-files are specific
-to CI scripts and shouldn't be used directly (you'll need, at least, to
-customize default `pkg-config` search path). Refer to Meson documentation for
-more info.
+Create a CMake toolchain file (e.g. `x86_64-w64-mingw32.cmake`):
 
-Setup build directory:
+    set(CMAKE_SYSTEM_NAME Windows)
+    set(CMAKE_SYSTEM_PROCESSOR x86_64)
+    set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
+    set(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)
+    set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
-    meson setup --cross-file x86_64-w64-mingw32.txt -Dwrap_mode=forcefallback builddir
+Configure and build:
 
-Build:
-
-    meson compile -C builddir
+    cmake -B build -G Ninja \
+        -DCMAKE_TOOLCHAIN_FILE=x86_64-w64-mingw32.cmake \
+        -DCMAKE_BUILD_TYPE=Release
+    cmake --build build
 
 
 Visual Studio
 -------------
 
-It is possible to build Q2PRO on Windows using Visual Studio 2022 and Meson.
+Q2PRO can be built on Windows using Visual Studio 2022.
 
-Install Visual Studio and Meson using official installers.
+Open the Q2PRO source directory using `File > Open > Folder` in Visual Studio.
+Visual Studio has built-in CMake support and will automatically detect the
+`CMakeLists.txt` file.
 
-Optionally, download and install nasm executable. The easiest way to add it
-into PATH is to put it into `Program Files/Meson`.
+Alternatively, from the `x64 Native Tools Command Prompt`:
 
-The build needs to be launched from appropriate Visual Studio command line
-shell, e.g. `x64 Native Tools Command Prompt`.
-
-Change to Q2PRO source directory, then setup build directory:
-
-    meson setup -Dwrap_mode=forcefallback builddir
-
-Build:
-
-    meson compile -C builddir
+    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    cmake --build build

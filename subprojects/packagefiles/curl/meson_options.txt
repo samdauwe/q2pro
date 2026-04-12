@@ -1,1 +1,0 @@
-option('windows-xp-compat', type: 'boolean', value: false, yield: true)

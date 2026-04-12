@@ -1,4 +1,7 @@
+/build
+/builddir
 /subprojects/*/
 !/subprojects/packagefiles/
 /tags
 /TAGS
+CMakeLists.txt.user

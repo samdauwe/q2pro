@@ -1,32 +1,67 @@
 Q2PRO
 =====
 
-Q2PRO is an enhanced Quake 2 client and server for Windows and Linux. Supported
-features include:
+Q2PRO is an enhanced, open-source Quake 2 client and server focused on
+multiplayer. It runs on Windows, Linux, macOS, and FreeBSD.
 
-* unified OpenGL renderer with support for wide range of OpenGL versions
-* enhanced console with persistent command history and autocompletion
-* rendering / physics / packet rate separation
-* syncing to GPU for reduced input lag with vsync on
+Q2PRO builds upon the original Quake 2 engine with a modernized codebase,
+improved networking, and extended renderer capabilities while maintaining full
+compatibility with the original game data. It also has work-in-progress support
+for the Nightdive remaster assets.
+
+## Features
+
+* Unified OpenGL renderer with support for a wide range of OpenGL versions
+* OpenGL ES 1.x renderer for embedded/mobile platforms
+* Enhanced console with persistent command history and autocompletion
+* Rendering / physics / packet rate separation
+* GPU sync for reduced input lag with vsync on
 * ZIP packfiles (.pkz)
 * JPEG/PNG textures and screenshots
 * MD3 and MD5 (re-release) models
-* Ogg Vorbis music and Ogg Theora cinematics
-* compatibility with re-release assets
-* fast and secure HTTP downloads
-* multichannel sound using OpenAL
-* stereo WAV files support
-* seeking in demos, recording from demos, server side multiview demos
-* live game broadcasting capabilities
-* network protocol extensions for larger maps
-* eliminates frame overflows (even for legacy clients)
-* won't crash if game data is corrupted
+* Ogg Vorbis music and Ogg Theora cinematics via FFmpeg
+* Compatibility with re-release assets
+* Fast and secure HTTP downloads via libcurl
+* Multichannel sound using OpenAL
+* Stereo WAV files support
+* Seeking in demos, recording from demos, server side multiview demos
+* Live game broadcasting capabilities (MVD/GTV)
+* Network protocol extensions for larger maps
+* Native X11 and Wayland video backends (in addition to SDL2)
+* Eliminates frame overflows (even for legacy clients)
+* Won't crash if game data is corrupted
 
-Q2PRO doesn't have releases. It is always recommended to use the latest nighly
-build from the top of Releases page.
+## Supported Mods
+
+Q2PRO's built-in game module is compatible with the base game. Third-party game
+libraries can be used for mission packs and mods, including:
+
+* **The Reckoning** (Xatrix)
+* **Ground Zero** (Rogue)
+* **Zaero**
+* **Capture the Flag**
+* **Nightdive Remaster** (work in progress)
+
+## Downloads
+
+Q2PRO doesn't have versioned releases. It is always recommended to use the
+latest nightly build from the top of the
+[Releases](https://github.com/skullernet/q2pro/releases) page.
 
 Linux binaries are not provided. Users are advised to build from source. See
-BUILDING.md file for instructions.
+[BUILDING.md](BUILDING.md) for instructions.
 
-For information on using and configuring Q2PRO, refer to client and server
-manuals available in doc/ subdirectory.
+## Documentation
+
+* [Building from source](BUILDING.md)
+* [Client manual](doc/client.asciidoc)
+* [Server manual](doc/server.asciidoc)
+
+## License
+
+Q2PRO is licensed under the terms of the **GNU General Public License v2.0**.
+See [LICENSE](LICENSE) for the full license text.
+
+The Quake II game data files remain copyrighted and licensed under the original
+id Software terms. You must own a copy of Quake 2 (retail or demo, patched to
+3.20) to play.
