@@ -185,10 +185,10 @@ typedef enum {
 } imagetype_t;
 
 // called when the library is loaded
-bool    R_Init(bool total);
+extern bool    (*R_Init)(bool total);
 
 // called before the library is unloaded
-void    R_Shutdown(bool total);
+extern void    (*R_Shutdown)(bool total);
 
 // All data that will be used in a level should be
 // registered before rendering any frames to prevent disk hits,
@@ -203,12 +203,12 @@ void    R_Shutdown(bool total);
 // are flood filled to eliminate mip map edge errors, and pics have
 // an implicit "pics/" prepended to the name. (a pic name that starts with a
 // slash will not use the "pics/" prefix or the ".pcx" postfix)
-void    R_BeginRegistration(const char *map);
+extern void    (*R_BeginRegistration)(const char *map);
 qhandle_t R_RegisterModel(const char *name);
 qhandle_t R_RegisterImage(const char *name, imagetype_t type,
                           imageflags_t flags);
-void    R_SetSky(const char *name, float rotate, bool autorotate, const vec3_t axis);
-void    R_EndRegistration(void);
+extern void    (*R_SetSky)(const char *name, float rotate, bool autorotate, const vec3_t axis);
+extern void    (*R_EndRegistration)(void);
 
 #define R_RegisterPic(name)     R_RegisterImage(name, IT_PIC, IF_PERMANENT)
 #define R_RegisterTempPic(name) R_RegisterImage(name, IT_PIC, IF_NONE)
@@ -216,32 +216,35 @@ void    R_EndRegistration(void);
 #define R_RegisterSkin(name)    R_RegisterImage(name, IT_SKIN, IF_NONE)
 #define R_RegisterSprite(name)  R_RegisterImage(name, IT_SPRITE, IF_NONE)
 
-void    R_RenderFrame(const refdef_t *fd);
-void    R_LightPoint(const vec3_t origin, vec3_t light);
+extern void    (*R_RenderFrame)(const refdef_t *fd);
+extern void    (*R_LightPoint)(const vec3_t origin, vec3_t light);
 
-void    R_ClearColor(void);
-void    R_SetAlpha(float clpha);
-void    R_SetColor(uint32_t color);
-void    R_SetClipRect(const clipRect_t *clip);
+extern void    (*R_ClearColor)(void);
+extern void    (*R_SetAlpha)(float clpha);
+extern void    (*R_SetColor)(uint32_t color);
+extern void    (*R_SetClipRect)(const clipRect_t *clip);
 float   R_ClampScale(cvar_t *var);
-void    R_SetScale(float scale);
-void    R_DrawChar(int x, int y, int flags, int ch, qhandle_t font);
-int     R_DrawString(int x, int y, int flags, size_t maxChars,
+extern void    (*R_SetScale)(float scale);
+extern void    (*R_DrawChar)(int x, int y, int flags, int ch, qhandle_t font);
+extern int     (*R_DrawString)(int x, int y, int flags, size_t maxChars,
                      const char *string, qhandle_t font);  // returns advanced x coord
 bool    R_GetPicSize(int *w, int *h, qhandle_t pic);   // returns transparency bit
-void    R_DrawPic(int x, int y, qhandle_t pic);
-void    R_DrawStretchPic(int x, int y, int w, int h, qhandle_t pic);
-void    R_DrawKeepAspectPic(int x, int y, int w, int h, qhandle_t pic);
-void    R_DrawStretchRaw(int x, int y, int w, int h);
-void    R_UpdateRawPic(int pic_w, int pic_h, const uint32_t *pic);
-void    R_TileClear(int x, int y, int w, int h, qhandle_t pic);
-void    R_DrawFill8(int x, int y, int w, int h, int c);
-void    R_DrawFill32(int x, int y, int w, int h, uint32_t color);
+extern void    (*R_DrawPic)(int x, int y, qhandle_t pic);
+extern void    (*R_DrawStretchPic)(int x, int y, int w, int h, qhandle_t pic);
+extern void    (*R_DrawKeepAspectPic)(int x, int y, int w, int h, qhandle_t pic);
+extern void    (*R_DrawStretchRaw)(int x, int y, int w, int h);
+extern void    (*R_UpdateRawPic)(int pic_w, int pic_h, const uint32_t *pic);
+extern void    (*R_TileClear)(int x, int y, int w, int h, qhandle_t pic);
+extern void    (*R_DrawFill8)(int x, int y, int w, int h, int c);
+extern void    (*R_DrawFill32)(int x, int y, int w, int h, uint32_t color);
 
 // video mode and refresh state management entry points
-void    R_BeginFrame(void);
-void    R_EndFrame(void);
-void    R_ModeChanged(int width, int height, int flags);
-bool    R_VideoSync(void);
+extern void    (*R_BeginFrame)(void);
+extern void    (*R_EndFrame)(void);
+extern void    (*R_ModeChanged)(int width, int height, int flags);
+extern bool    (*R_VideoSync)(void);
 
 r_opengl_config_t R_GetGLConfig(void);
+
+// backend registration
+void R_RegisterFunctionsGL(void);

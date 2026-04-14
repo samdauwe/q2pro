@@ -169,25 +169,25 @@ void GL_Blend(void)
     }
 }
 
-void R_ClearColor(void)
+void R_ClearColor_GL(void)
 {
     draw.colors[0].u32 = U32_WHITE;
     draw.colors[1].u32 = U32_WHITE;
 }
 
-void R_SetAlpha(float alpha)
+void R_SetAlpha_GL(float alpha)
 {
     draw.colors[0].u8[3] =
     draw.colors[1].u8[3] = alpha * 255;
 }
 
-void R_SetColor(uint32_t color)
+void R_SetColor_GL(uint32_t color)
 {
     draw.colors[0].u32 = color;
     draw.colors[1].u8[3] = draw.colors[0].u8[3];
 }
 
-void R_SetClipRect(const clipRect_t *clip)
+void R_SetClipRect_GL(const clipRect_t *clip)
 {
     clipRect_t rc;
     float scale;
@@ -264,7 +264,7 @@ float R_ClampScale(cvar_t *var)
     return 1.0f / get_auto_scale();
 }
 
-void R_SetScale(float scale)
+void R_SetScale_GL(float scale)
 {
     if (draw.scale == scale)
         return;
@@ -277,7 +277,7 @@ void R_SetScale(float scale)
     draw.scale = scale;
 }
 
-void R_DrawStretchPic(int x, int y, int w, int h, qhandle_t pic)
+void R_DrawStretchPic_GL(int x, int y, int w, int h, qhandle_t pic)
 {
     const image_t *image = IMG_ForHandle(pic);
 
@@ -285,7 +285,7 @@ void R_DrawStretchPic(int x, int y, int w, int h, qhandle_t pic)
                   draw.colors[0].u32, image);
 }
 
-void R_DrawKeepAspectPic(int x, int y, int w, int h, qhandle_t pic)
+void R_DrawKeepAspectPic_GL(int x, int y, int w, int h, qhandle_t pic)
 {
     const image_t *image = IMG_ForHandle(pic);
 
@@ -304,7 +304,7 @@ void R_DrawKeepAspectPic(int x, int y, int w, int h, qhandle_t pic)
     GL_StretchPic(x, y, w, h, s, t, 1.0f - s, 1.0f - t, draw.colors[0].u32, image);
 }
 
-void R_DrawPic(int x, int y, qhandle_t pic)
+void R_DrawPic_GL(int x, int y, qhandle_t pic)
 {
     const image_t *image = IMG_ForHandle(pic);
 
@@ -312,12 +312,12 @@ void R_DrawPic(int x, int y, qhandle_t pic)
                   image->sl, image->tl, image->sh, image->th, draw.colors[0].u32, image);
 }
 
-void R_DrawStretchRaw(int x, int y, int w, int h)
+void R_DrawStretchRaw_GL(int x, int y, int w, int h)
 {
     GL_StretchPic_(x, y, w, h, 0, 0, 1, 1, U32_WHITE, TEXNUM_RAW, 0);
 }
 
-void R_UpdateRawPic(int pic_w, int pic_h, const uint32_t *pic)
+void R_UpdateRawPic_GL(int pic_w, int pic_h, const uint32_t *pic)
 {
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_RAW);
     qglTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pic_w, pic_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pic);
@@ -325,20 +325,20 @@ void R_UpdateRawPic(int pic_w, int pic_h, const uint32_t *pic)
 
 #define DIV64 (1.0f / 64.0f)
 
-void R_TileClear(int x, int y, int w, int h, qhandle_t pic)
+void R_TileClear_GL(int x, int y, int w, int h, qhandle_t pic)
 {
     GL_StretchPic(x, y, w, h, x * DIV64, y * DIV64,
                   (x + w) * DIV64, (y + h) * DIV64, U32_WHITE, IMG_ForHandle(pic));
 }
 
-void R_DrawFill8(int x, int y, int w, int h, int c)
+void R_DrawFill8_GL(int x, int y, int w, int h, int c)
 {
     if (!w || !h)
         return;
     GL_StretchPic_(x, y, w, h, 0, 0, 1, 1, d_8to24table[c & 0xff], TEXNUM_WHITE, 0);
 }
 
-void R_DrawFill32(int x, int y, int w, int h, uint32_t color)
+void R_DrawFill32_GL(int x, int y, int w, int h, uint32_t color)
 {
     if (!w || !h)
         return;
@@ -376,7 +376,7 @@ static inline void draw_char(int x, int y, int flags, int c, const image_t *imag
                   s + 0.0625f, t + 0.0625f, draw.colors[c >> 7].u32, image);
 }
 
-void R_DrawChar(int x, int y, int flags, int c, qhandle_t font)
+void R_DrawChar_GL(int x, int y, int flags, int c, qhandle_t font)
 {
     if (gl_fontshadow->integer > 0)
         flags |= UI_DROPSHADOW;
@@ -384,7 +384,7 @@ void R_DrawChar(int x, int y, int flags, int c, qhandle_t font)
     draw_char(x, y, flags, c & 255, IMG_ForHandle(font));
 }
 
-int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font)
+int R_DrawString_GL(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font)
 {
     const image_t *image = IMG_ForHandle(font);
 

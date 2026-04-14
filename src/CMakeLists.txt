@@ -76,21 +76,24 @@ set(UI_SRC
 )
 
 set(REFRESH_SRC
-    refresh/draw.c
-    refresh/hq2x.c
     refresh/images.c
-    refresh/legacy.c
-    refresh/main.c
-    refresh/mesh.c
-    refresh/models.c
-    refresh/qgl.c
-    refresh/shader.c
-    refresh/sky.c
-    refresh/state.c
-    refresh/surf.c
-    refresh/tess.c
-    refresh/texture.c
-    refresh/world.c
+)
+
+set(SRC_GL
+    refresh/gl/draw.c
+    refresh/gl/hq2x.c
+    refresh/gl/legacy.c
+    refresh/gl/main.c
+    refresh/gl/mesh.c
+    refresh/gl/models.c
+    refresh/gl/qgl.c
+    refresh/gl/shader.c
+    refresh/gl/sky.c
+    refresh/gl/state.c
+    refresh/gl/surf.c
+    refresh/gl/tess.c
+    refresh/gl/texture.c
+    refresh/gl/world.c
 )
 
 set(SERVER_SRC
@@ -549,7 +552,7 @@ if(Q2PRO_TESTS)
 endif()
 
 if(Q2PRO_DEBUG)
-    list(APPEND REFRESH_SRC refresh/debug.c)
+    list(APPEND SRC_GL refresh/gl/debug.c)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -664,7 +667,7 @@ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 # ---------------------------------------------------------------------------
 # Client executable: q2pro
 # ---------------------------------------------------------------------------
-set(_client_all_src ${COMMON_SRC} ${CLIENT_SRC} ${REFRESH_SRC}
+set(_client_all_src ${COMMON_SRC} ${CLIENT_SRC} ${REFRESH_SRC} ${SRC_GL}
                     ${PLATFORM_COMMON_SRC} ${PLATFORM_CLIENT_SRC})
 list(TRANSFORM _client_all_src PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
 

@@ -770,7 +770,7 @@ static void MOD_PrintError(const char *path, int err)
 
 #define JSMN_STATIC
 #define JSMN_PARENT_LINKS
-#include "jsmn.h"
+#include "../jsmn.h"
 
 static jmp_buf md5_jmpbuf;
 

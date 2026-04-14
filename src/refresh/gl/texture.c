@@ -822,10 +822,10 @@ static bool GL_UploadCubemap(image_t *image, byte *pic)
 
 /*
 ================
-IMG_Load
+IMG_Load_GL
 ================
 */
-void IMG_Load(image_t *image, byte *pic)
+void IMG_Load_GL(image_t *image, byte *pic)
 {
     byte    *src, *dst;
     int     i, s, t, maxlevel;
@@ -889,7 +889,7 @@ void IMG_Load(image_t *image, byte *pic)
     }
 }
 
-void IMG_Unload(image_t *image)
+void IMG_Unload_GL(image_t *image)
 {
     if (image->texnum && !(image->flags & IF_SCRAP)) {
         GLuint tex[2] = { image->texnum, image->texnum2 };
@@ -908,7 +908,7 @@ void IMG_Unload(image_t *image)
 }
 
 // for screenshots
-int IMG_ReadPixels(screenshot_t *s)
+int IMG_ReadPixels_GL(screenshot_t *s)
 {
     int format = gl_config.ver_es ? GL_RGBA : GL_RGB;
     int align = 4, bpp = format == GL_RGBA ? 4 : 3;

@@ -31,7 +31,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "client/client.h"
 #include "refresh/refresh.h"
 #include "system/hunk.h"
-#include "images.h"
+#include "../images.h"
 #include "qgl.h"
 
 /*
@@ -943,6 +943,7 @@ void GL_DrawBspModel(mmodel_t *model);
 void GL_DrawWorld(void);
 void GL_SampleLightPoint(vec3_t color);
 void GL_LightPoint(const vec3_t origin, vec3_t color);
+void R_LightPoint_GL(const vec3_t origin, vec3_t color);
 
 /*
  * gl_sky.c
@@ -952,7 +953,7 @@ void R_AddSkySurface(const mface_t *surf);
 void R_ClearSkyBox(void);
 void R_DrawSkyBox(void);
 void R_RotateForSky(void);
-void R_SetSky(const char *name, float rotate, bool autorotate, const vec3_t axis);
+void R_SetSky_GL(const char *name, float rotate, bool autorotate, const vec3_t axis);
 
 /*
  * gl_mesh.c
@@ -981,3 +982,45 @@ void GL_DrawDebugObjects(void);
 #define GL_ShutdownDebugDraw()  (void)0
 #define GL_DrawDebugObjects()   (void)0
 #endif
+
+/*
+ * gl_main.c -- GL backend function declarations
+ *
+ */
+bool R_Init_GL(bool total);
+void R_Shutdown_GL(bool total);
+void R_BeginRegistration_GL(const char *name);
+void R_EndRegistration_GL(void);
+void R_RenderFrame_GL(const refdef_t *fd);
+void R_BeginFrame_GL(void);
+void R_EndFrame_GL(void);
+void R_ModeChanged_GL(int width, int height, int flags);
+bool R_VideoSync_GL(void);
+
+/*
+ * gl_draw.c -- GL backend function declarations
+ *
+ */
+void R_ClearColor_GL(void);
+void R_SetAlpha_GL(float alpha);
+void R_SetColor_GL(uint32_t color);
+void R_SetClipRect_GL(const clipRect_t *clip);
+void R_SetScale_GL(float scale);
+void R_DrawChar_GL(int x, int y, int flags, int c, qhandle_t font);
+int  R_DrawString_GL(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font);
+void R_DrawPic_GL(int x, int y, qhandle_t pic);
+void R_DrawStretchPic_GL(int x, int y, int w, int h, qhandle_t pic);
+void R_DrawKeepAspectPic_GL(int x, int y, int w, int h, qhandle_t pic);
+void R_DrawStretchRaw_GL(int x, int y, int w, int h);
+void R_UpdateRawPic_GL(int pic_w, int pic_h, const uint32_t *pic);
+void R_TileClear_GL(int x, int y, int w, int h, qhandle_t pic);
+void R_DrawFill8_GL(int x, int y, int w, int h, int c);
+void R_DrawFill32_GL(int x, int y, int w, int h, uint32_t color);
+
+/*
+ * gl_texture.c -- GL backend function declarations
+ *
+ */
+void IMG_Load_GL(image_t *image, byte *pic);
+void IMG_Unload_GL(image_t *image);
+int  IMG_ReadPixels_GL(screenshot_t *s);

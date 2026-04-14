@@ -793,7 +793,7 @@ static pp_flags_t GL_BindFramebuffer(void)
     return flags;
 }
 
-void R_RenderFrame(const refdef_t *fd)
+void R_RenderFrame_GL(const refdef_t *fd)
 {
     GL_Flush2D();
 
@@ -880,7 +880,7 @@ void R_RenderFrame(const refdef_t *fd)
         GL_ShowErrors(__func__);
 }
 
-void R_BeginFrame(void)
+void R_BeginFrame_GL(void)
 {
     memset(&c, 0, sizeof(c));
 
@@ -896,7 +896,7 @@ void R_BeginFrame(void)
         GL_ShowErrors(__func__);
 }
 
-void R_EndFrame(void)
+void R_EndFrame_GL(void)
 {
     extern cvar_t *cl_async;
 
@@ -922,7 +922,7 @@ void R_EndFrame(void)
         gl_static.sync = qglFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 }
 
-bool R_VideoSync(void)
+bool R_VideoSync_GL(void)
 {
     if (!gl_static.sync)
         return true;
@@ -1318,10 +1318,10 @@ void GL_DeleteQueries(void)
 
 /*
 ===============
-R_Init
+R_Init_GL
 ===============
 */
-bool R_Init(bool total)
+bool R_Init_GL(bool total)
 {
     Com_DPrintf("GL_Init( %i )\n", total);
 
@@ -1374,10 +1374,10 @@ fail:
 
 /*
 ===============
-R_Shutdown
+R_Shutdown_GL
 ===============
 */
-void R_Shutdown(bool total)
+void R_Shutdown_GL(bool total)
 {
     Com_DPrintf("GL_Shutdown( %i )\n", total);
 
@@ -1470,10 +1470,10 @@ r_opengl_config_t R_GetGLConfig(void)
 
 /*
 ===============
-R_BeginRegistration
+R_BeginRegistration_GL
 ===============
 */
-void R_BeginRegistration(const char *name)
+void R_BeginRegistration_GL(const char *name)
 {
     gl_static.registering = true;
     r_registration_sequence++;
@@ -1486,10 +1486,10 @@ void R_BeginRegistration(const char *name)
 
 /*
 ===============
-R_EndRegistration
+R_EndRegistration_GL
 ===============
 */
-void R_EndRegistration(void)
+void R_EndRegistration_GL(void)
 {
     IMG_FreeUnused();
     MOD_FreeUnused();
@@ -1499,10 +1499,10 @@ void R_EndRegistration(void)
 
 /*
 ===============
-R_ModeChanged
+R_ModeChanged_GL
 ===============
 */
-void R_ModeChanged(int width, int height, int flags)
+void R_ModeChanged_GL(int width, int height, int flags)
 {
     if (qglFenceSync)
         flags |= QVF_VIDEOSYNC;
@@ -1510,4 +1510,42 @@ void R_ModeChanged(int width, int height, int flags)
     r_config.width = width;
     r_config.height = height;
     r_config.flags = flags;
+}
+
+/*
+===============
+R_RegisterFunctionsGL
+===============
+*/
+void R_RegisterFunctionsGL(void)
+{
+    R_Init = R_Init_GL;
+    R_Shutdown = R_Shutdown_GL;
+    R_BeginRegistration = R_BeginRegistration_GL;
+    R_EndRegistration = R_EndRegistration_GL;
+    R_SetSky = R_SetSky_GL;
+    R_RenderFrame = R_RenderFrame_GL;
+    R_LightPoint = R_LightPoint_GL;
+    R_ClearColor = R_ClearColor_GL;
+    R_SetAlpha = R_SetAlpha_GL;
+    R_SetColor = R_SetColor_GL;
+    R_SetClipRect = R_SetClipRect_GL;
+    R_SetScale = R_SetScale_GL;
+    R_DrawChar = R_DrawChar_GL;
+    R_DrawString = R_DrawString_GL;
+    R_DrawPic = R_DrawPic_GL;
+    R_DrawStretchPic = R_DrawStretchPic_GL;
+    R_DrawKeepAspectPic = R_DrawKeepAspectPic_GL;
+    R_DrawStretchRaw = R_DrawStretchRaw_GL;
+    R_UpdateRawPic = R_UpdateRawPic_GL;
+    R_TileClear = R_TileClear_GL;
+    R_DrawFill8 = R_DrawFill8_GL;
+    R_DrawFill32 = R_DrawFill32_GL;
+    R_BeginFrame = R_BeginFrame_GL;
+    R_EndFrame = R_EndFrame_GL;
+    R_ModeChanged = R_ModeChanged_GL;
+    R_VideoSync = R_VideoSync_GL;
+    IMG_Load = IMG_Load_GL;
+    IMG_Unload = IMG_Unload_GL;
+    IMG_ReadPixels = IMG_ReadPixels_GL;
 }

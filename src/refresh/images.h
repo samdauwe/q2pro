@@ -92,8 +92,8 @@ void IMG_GetPalette(void);
 
 image_t *IMG_ForHandle(qhandle_t h);
 
-void IMG_Unload(image_t *image);
-void IMG_Load(image_t *image, byte *pic);
+extern void (*IMG_Unload)(image_t *image);
+extern void (*IMG_Load)(image_t *image, byte *pic);
 
 typedef struct screenshot_s screenshot_t;
 
@@ -108,4 +108,4 @@ struct screenshot_s {
     bool async;
 };
 
-int IMG_ReadPixels(screenshot_t *s);
+extern int (*IMG_ReadPixels)(screenshot_t *s);
