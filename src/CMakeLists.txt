@@ -77,6 +77,7 @@ set(UI_SRC
 
 set(REFRESH_SRC
     refresh/images.c
+    refresh/stb/stb.c
 )
 
 set(SRC_GL
@@ -192,44 +193,6 @@ if(ZLIB_FOUND)
     set(HAVE_ZLIB ON)
 endif()
 
-# libpng
-q2pro_find_dependency(PNG PNG)
-set(HAVE_PNG OFF)
-if(PNG_FOUND)
-    set(HAVE_PNG ON)
-endif()
-
-# libjpeg
-set(HAVE_JPG OFF)
-set(_jpeg_mode "${Q2PRO_USE_JPEG}")
-if(NOT _jpeg_mode STREQUAL "OFF")
-    if(_jpeg_mode STREQUAL "ON")
-        find_package(JPEG REQUIRED)
-    else()
-        find_package(JPEG QUIET)
-    endif()
-    if(JPEG_FOUND)
-        # Check for JCS_EXT_RGBA (libjpeg-turbo)
-        include(CheckCSourceCompiles)
-        set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIRS})
-        set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
-        check_c_source_compiles("
-            #include <stdio.h>
-            #include <jpeglib.h>
-            int main(void) { int x = JCS_EXT_RGBA; return x; }
-        " HAVE_JCS_EXT_RGBA)
-        unset(CMAKE_REQUIRED_INCLUDES)
-        unset(CMAKE_REQUIRED_LIBRARIES)
-        if(HAVE_JCS_EXT_RGBA)
-            set(HAVE_JPG ON)
-        elseif(_jpeg_mode STREQUAL "ON")
-            message(FATAL_ERROR "libjpeg found but lacks JCS_EXT_RGBA (need libjpeg-turbo)")
-        else()
-            message(STATUS "libjpeg found but lacks JCS_EXT_RGBA – disabling JPEG support")
-        endif()
-    endif()
-endif()
-
 # libcurl
 q2pro_find_dependency(CURL CURL)
 set(HAVE_CURL OFF)
@@ -288,14 +251,8 @@ if(NOT _av_mode STREQUAL "OFF")
     endif()
 endif()
 
-# Texture format list
-set(Q2PRO_TEXTURE_FORMATS "")
-if(HAVE_PNG)
-    list(APPEND Q2PRO_TEXTURE_FORMATS "png")
-endif()
-if(HAVE_JPG)
-    list(APPEND Q2PRO_TEXTURE_FORMATS "jpg")
-endif()
+# Texture format list (stb_image always provides png and jpg support)
+set(Q2PRO_TEXTURE_FORMATS "png" "jpg")
 if(Q2PRO_TGA)
     list(APPEND Q2PRO_TEXTURE_FORMATS "tga")
 endif()
@@ -590,8 +547,7 @@ macro(q2pro_bool_to_01 _var _out)
 endmacro()
 
 q2pro_bool_to_01(HAVE_ZLIB        USE_ZLIB)
-q2pro_bool_to_01(HAVE_PNG         USE_PNG)
-q2pro_bool_to_01(HAVE_JPG         USE_JPG)
+
 q2pro_bool_to_01(HAVE_CURL        USE_CURL)
 q2pro_bool_to_01(HAVE_OPENAL      USE_OPENAL)
 q2pro_bool_to_01(HAVE_AVCODEC     USE_AVCODEC)
@@ -699,12 +655,7 @@ if(_can_build_client)
     if(HAVE_ZLIB)
         target_link_libraries(q2pro PRIVATE ZLIB::ZLIB)
     endif()
-    if(HAVE_PNG)
-        target_link_libraries(q2pro PRIVATE PNG::PNG)
-    endif()
-    if(HAVE_JPG)
-        target_link_libraries(q2pro PRIVATE JPEG::JPEG)
-    endif()
+    target_link_libraries(q2pro PRIVATE stb)
     if(HAVE_CURL)
         target_link_libraries(q2pro PRIVATE CURL::libcurl)
     endif()

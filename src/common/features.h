@@ -46,12 +46,7 @@ static const char *Com_GetFeatures(void)
 #if USE_CURL
     "libcurl "
 #endif
-#if USE_JPG
-    "libjpeg "
-#endif
-#if USE_PNG
-    "libpng "
-#endif
+    "stb-image "
 #if USE_MD3
     "md3 "
 #endif

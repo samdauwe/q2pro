@@ -33,16 +33,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "format/wal.h"
 #include "images.h"
 
-#if USE_PNG
-#define PNG_SKIP_SETJMP_CHECK
-#include <png.h>
-#endif // USE_PNG
-
-#if USE_JPG
-#include <jpeglib.h>
-#endif
-
-#include <setjmp.h>
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 #define R_COLORMAP_PCX    "pics/colormap.pcx"
 
@@ -724,426 +716,123 @@ static int IMG_SaveTGA(const screenshot_t *s)
 /*
 =========================================================
 
-JPEG IMAGES
+STB_IMAGE LOADING (replaces libpng and libjpeg-turbo)
 
 =========================================================
 */
 
-#if USE_JPG
-
-typedef struct my_error_mgr {
-    struct jpeg_error_mgr   pub;
-    jmp_buf                 setjmp_buffer;
-    const char              *filename;
-} *my_error_ptr;
-
-static void my_output_message_2(j_common_ptr cinfo, bool err_exit)
+static void stbi_write_cb(void *context, void *data, int size)
 {
-    char buffer[JMSG_LENGTH_MAX];
-    my_error_ptr jerr = (my_error_ptr)cinfo->err;
-
-    if (!jerr->filename)
-        return;
-
-    (*cinfo->err->format_message)(cinfo, buffer);
-
-    if (err_exit)
-        Com_SetLastError(buffer);
-    else
-        Com_WPrintf("libjpeg: %s: %s\n", jerr->filename, buffer);
-}
-
-static void my_output_message(j_common_ptr cinfo)
-{
-    my_output_message_2(cinfo, false);
-}
-
-static void my_error_exit(j_common_ptr cinfo)
-{
-    my_error_ptr jerr = (my_error_ptr)cinfo->err;
-
-    my_output_message_2(cinfo, true);
-
-    longjmp(jerr->setjmp_buffer, 1);
-}
-
-static int my_jpeg_start_decompress(j_decompress_ptr cinfo, const byte *rawdata, size_t rawlen)
-{
-    my_error_ptr jerr = (my_error_ptr)cinfo->err;
-
-    if (setjmp(jerr->setjmp_buffer))
-        return Q_ERR_LIBRARY_ERROR;
-
-    jpeg_create_decompress(cinfo);
-    jpeg_mem_src(cinfo, rawdata, rawlen);
-    jpeg_read_header(cinfo, TRUE);
-
-    if (cinfo->out_color_space != JCS_RGB && cinfo->out_color_space != JCS_GRAYSCALE) {
-        Com_SetLastError("Invalid image color space");
-        return Q_ERR_INVALID_FORMAT;
-    }
-
-    cinfo->out_color_space = JCS_EXT_RGBA;
-
-    jpeg_start_decompress(cinfo);
-
-    if (cinfo->output_components != 4) {
-        Com_SetLastError("Invalid number of color components");
-        return Q_ERR_INVALID_FORMAT;
-    }
-
-    if (check_image_size(cinfo->output_width, cinfo->output_height)) {
-        Com_SetLastError("Invalid image dimensions");
-        return Q_ERR_INVALID_FORMAT;
-    }
-
-    return Q_ERR_SUCCESS;
-}
-
-static int my_jpeg_finish_decompress(j_decompress_ptr cinfo, JSAMPARRAY row_pointers)
-{
-    my_error_ptr jerr = (my_error_ptr)cinfo->err;
-
-    if (setjmp(jerr->setjmp_buffer))
-        return Q_ERR_LIBRARY_ERROR;
-
-    while (cinfo->output_scanline < cinfo->output_height)
-        jpeg_read_scanlines(cinfo, &row_pointers[cinfo->output_scanline], cinfo->output_height - cinfo->output_scanline);
-
-    jpeg_finish_decompress(cinfo);
-    return Q_ERR_SUCCESS;
+    fwrite(data, size, 1, ((const screenshot_t *)context)->fp);
 }
 
 IMG_LOAD(JPG)
 {
-    JSAMPROW row_pointers[MAX_TEXTURE_SIZE];
-    struct jpeg_decompress_struct cinfo;
-    struct my_error_mgr jerr;
-    byte *pixels;
-    int ret, row, rowbytes;
+    int w, h, channels;
+    byte *data;
 
-    cinfo.err = jpeg_std_error(&jerr.pub);
-    jerr.pub.error_exit = my_error_exit;
-    jerr.pub.output_message = my_output_message;
-    jerr.filename = image->name;
-
-    ret = my_jpeg_start_decompress(&cinfo, rawdata, rawlen);
-    if (ret < 0)
-        goto fail;
-
-    image->upload_width = image->width = cinfo.output_width;
-    image->upload_height = image->height = cinfo.output_height;
-    image->flags |= IF_OPAQUE;
-
-    rowbytes = cinfo.output_width * 4;
-    pixels = IMG_AllocPixels(cinfo.output_height * rowbytes);
-
-    for (row = 0; row < cinfo.output_height; row++)
-        row_pointers[row] = (JSAMPROW)(pixels + row * rowbytes);
-
-    ret = my_jpeg_finish_decompress(&cinfo, row_pointers);
-    if (ret < 0) {
-        IMG_FreePixels(pixels);
-        goto fail;
+    data = stbi_load_from_memory(rawdata, (int)rawlen, &w, &h, &channels, 4);
+    if (!data) {
+        Com_SetLastError(stbi_failure_reason());
+        return Q_ERR_LIBRARY_ERROR;
     }
 
-    *pic = pixels;
-fail:
-    jpeg_destroy_decompress(&cinfo);
-    return ret;
+    if (check_image_size(w, h)) {
+        Com_SetLastError("Invalid image dimensions");
+        stbi_image_free(data);
+        return Q_ERR_INVALID_FORMAT;
+    }
+
+    /* stb_image returns data allocated via Z_Malloc (see stb.c),
+       but IMG_Load expects IMG_AllocPixels memory. Copy and free. */
+    size_t size = (size_t)w * h * 4;
+    *pic = IMG_AllocPixels(size);
+    memcpy(*pic, data, size);
+    stbi_image_free(data);
+
+    image->upload_width = image->width = w;
+    image->upload_height = image->height = h;
+
+    if (channels == 3)
+        image->flags |= IF_OPAQUE;
+
+    return Q_ERR_SUCCESS;
 }
 
-static int my_jpeg_compress(j_compress_ptr cinfo, JSAMPARRAY row_pointers, const screenshot_t *s)
+IMG_LOAD(PNG)
 {
-    my_error_ptr jerr = (my_error_ptr)cinfo->err;
+    int w, h, channels;
+    byte *data;
 
-    if (setjmp(jerr->setjmp_buffer))
+    data = stbi_load_from_memory(rawdata, (int)rawlen, &w, &h, &channels, 4);
+    if (!data) {
+        Com_SetLastError(stbi_failure_reason());
         return Q_ERR_LIBRARY_ERROR;
+    }
 
-    jpeg_create_compress(cinfo);
-    jpeg_stdio_dest(cinfo, s->fp);
+    if (check_image_size(w, h)) {
+        Com_SetLastError("Invalid image dimensions");
+        stbi_image_free(data);
+        return Q_ERR_INVALID_FORMAT;
+    }
 
-    cinfo->image_width = s->width;
-    cinfo->image_height = s->height;
-    cinfo->input_components = s->bpp;
-    cinfo->in_color_space = s->bpp == 4 ? JCS_EXT_RGBA : JCS_RGB;
+    size_t size = (size_t)w * h * 4;
+    *pic = IMG_AllocPixels(size);
+    memcpy(*pic, data, size);
+    stbi_image_free(data);
 
-    jpeg_set_defaults(cinfo);
-    jpeg_set_quality(cinfo, Q_clip(s->param, 0, 100), TRUE);
+    image->upload_width = image->width = w;
+    image->upload_height = image->height = h;
 
-    jpeg_start_compress(cinfo, TRUE);
-    jpeg_write_scanlines(cinfo, row_pointers, s->height);
-    jpeg_finish_compress(cinfo);
+    if (channels <= 3)
+        image->flags |= IF_OPAQUE;
 
     return Q_ERR_SUCCESS;
 }
 
 static int IMG_SaveJPG(const screenshot_t *s)
 {
-    struct jpeg_compress_struct cinfo;
-    struct my_error_mgr jerr;
-    JSAMPARRAY row_pointers;
-    int i, ret;
+    stbi_flip_vertically_on_write(1);
+    int quality = Q_clip(s->param, 1, 100);
 
-    cinfo.err = jpeg_std_error(&jerr.pub);
-    jerr.pub.error_exit = my_error_exit;
-    jerr.pub.output_message = my_output_message;
-    jerr.filename = s->async ? NULL : s->filename;
+    /* stbi_write_jpg does not support row stride/padding.
+       If rowbytes > width * bpp, we need tightly packed data.
+       Allocate a temp buffer and repack if necessary. */
+    int ideal_pitch = s->width * s->bpp;
+    const byte *pixels = s->pixels;
+    byte *tmp = NULL;
 
-    row_pointers = malloc(sizeof(JSAMPROW) * s->height);
-    if (!row_pointers)
-        return Q_ERR(ENOMEM);
-
-    for (i = 0; i < s->height; i++)
-        row_pointers[i] = (JSAMPROW)(s->pixels + (s->height - i - 1) * s->rowbytes);
-
-    ret = my_jpeg_compress(&cinfo, row_pointers, s);
-    free(row_pointers);
-    jpeg_destroy_compress(&cinfo);
-    return ret;
-}
-
-#endif // USE_JPG
-
-/*
-=========================================================
-
-PNG IMAGES
-
-=========================================================
-*/
-
-#if USE_PNG
-
-typedef struct {
-    png_const_bytep next_in;
-    png_size_t avail_in;
-} my_png_io;
-
-typedef struct {
-    jmp_buf setjmp_buffer;
-    png_const_charp filename;
-} my_png_error;
-
-static void my_png_read_fn(png_structp png_ptr, png_bytep buf, png_size_t size)
-{
-    my_png_io *io = png_get_io_ptr(png_ptr);
-
-    if (size > io->avail_in) {
-        png_error(png_ptr, "read error");
-    } else {
-        memcpy(buf, io->next_in, size);
-        io->next_in += size;
-        io->avail_in -= size;
-    }
-}
-
-static void my_png_error_fn(png_structp png_ptr, png_const_charp error_msg)
-{
-    my_png_error *err = png_get_error_ptr(png_ptr);
-
-    if (err->filename)
-        Com_SetLastError(error_msg);
-
-    longjmp(err->setjmp_buffer, -1);
-}
-
-static void my_png_warning_fn(png_structp png_ptr, png_const_charp warning_msg)
-{
-    my_png_error *err = png_get_error_ptr(png_ptr);
-
-    if (err->filename)
-        Com_WPrintf("libpng: %s: %s\n", err->filename, warning_msg);
-}
-
-static int my_png_read_header(png_structp png_ptr, png_infop info_ptr,
-                              png_voidp io_ptr, image_t *image)
-{
-    my_png_error *err = png_get_error_ptr(png_ptr);
-    png_uint_32 w, h, has_tRNS;
-    int bitdepth, colortype;
-
-    if (setjmp(err->setjmp_buffer))
-        return Q_ERR_LIBRARY_ERROR;
-
-    png_set_read_fn(png_ptr, io_ptr, my_png_read_fn);
-
-    png_read_info(png_ptr, info_ptr);
-
-    if (!png_get_IHDR(png_ptr, info_ptr, &w, &h, &bitdepth, &colortype, NULL, NULL, NULL))
-        return Q_ERR_FAILURE;
-
-    if (check_image_size(w, h)) {
-        Com_SetLastError("Invalid image dimensions");
-        return Q_ERR_INVALID_FORMAT;
+    if (s->rowbytes > ideal_pitch) {
+        tmp = Z_Malloc(ideal_pitch * s->height);
+        for (int row = 0; row < s->height; row++)
+            memcpy(tmp + row * ideal_pitch, s->pixels + row * s->rowbytes, ideal_pitch);
+        pixels = tmp;
     }
 
-    switch (colortype) {
-    case PNG_COLOR_TYPE_PALETTE:
-        png_set_palette_to_rgb(png_ptr);
-        break;
-    case PNG_COLOR_TYPE_GRAY:
-        if (bitdepth < 8)
-            png_set_expand_gray_1_2_4_to_8(png_ptr);
-        // fall through
-    case PNG_COLOR_TYPE_GRAY_ALPHA:
-        png_set_gray_to_rgb(png_ptr);
-        break;
-    }
+    int ret = stbi_write_jpg_to_func(stbi_write_cb, (void *)s,
+                                     s->width, s->height, s->bpp,
+                                     pixels, quality);
+    Z_Free(tmp);
 
-    if (bitdepth < 8)
-        png_set_packing(png_ptr);
-    else if (bitdepth == 16)
-        png_set_strip_16(png_ptr);
+    if (ret)
+        return Q_ERR_SUCCESS;
 
-    has_tRNS = png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS);
-    if (has_tRNS)
-        png_set_tRNS_to_alpha(png_ptr);
-
-    png_set_filler(png_ptr, 0xff, PNG_FILLER_AFTER);
-
-    png_set_interlace_handling(png_ptr);
-
-    png_read_update_info(png_ptr, info_ptr);
-
-    image->upload_width = image->width = w;
-    image->upload_height = image->height = h;
-
-    if (colortype == PNG_COLOR_TYPE_PALETTE)
-        image->flags |= IF_PALETTED;
-
-    if (!has_tRNS && !(colortype & PNG_COLOR_MASK_ALPHA))
-        image->flags |= IF_OPAQUE;
-
-    return Q_ERR_SUCCESS;
-}
-
-static int my_png_read_image(png_structp png_ptr, png_infop info_ptr, png_bytepp row_pointers)
-{
-    my_png_error *err = png_get_error_ptr(png_ptr);
-
-    if (setjmp(err->setjmp_buffer))
-        return Q_ERR_LIBRARY_ERROR;
-
-    png_read_image(png_ptr, row_pointers);
-    png_read_end(png_ptr, info_ptr);
-    return Q_ERR_SUCCESS;
-}
-
-IMG_LOAD(PNG)
-{
-    byte *pixels;
-    png_bytep row_pointers[MAX_TEXTURE_SIZE];
-    png_structp png_ptr;
-    png_infop info_ptr;
-    my_png_error my_err;
-    my_png_io my_io;
-    int h, ret, row, rowbytes;
-
-    if (rawlen < 8)
-        return Q_ERR_FILE_TOO_SMALL;
-
-    if (png_sig_cmp(rawdata, 0, 8))
-        return Q_ERR_UNKNOWN_FORMAT;
-
-    my_err.filename = image->name;
-    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                                     (png_voidp)&my_err, my_png_error_fn, my_png_warning_fn);
-    if (!png_ptr) {
-        Com_SetLastError("png_create_read_struct failed");
-        return Q_ERR_LIBRARY_ERROR;
-    }
-
-    png_set_option(png_ptr, PNG_SKIP_sRGB_CHECK_PROFILE, PNG_OPTION_ON);
-
-    info_ptr = png_create_info_struct(png_ptr);
-    if (!info_ptr) {
-        ret = Q_ERR_FAILURE;
-        goto fail;
-    }
-
-    my_io.next_in = rawdata;
-    my_io.avail_in = rawlen;
-    ret = my_png_read_header(png_ptr, info_ptr, (png_voidp)&my_io, image);
-    if (ret < 0)
-        goto fail;
-
-    h = image->height;
-    rowbytes = image->width * 4;
-    pixels = IMG_AllocPixels(h * rowbytes);
-
-    for (row = 0; row < h; row++)
-        row_pointers[row] = (png_bytep)(pixels + row * rowbytes);
-
-    ret = my_png_read_image(png_ptr, info_ptr, row_pointers);
-    if (ret < 0) {
-        IMG_FreePixels(pixels);
-        goto fail;
-    }
-
-    *pic = pixels;
-fail:
-    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-    return ret;
-}
-
-static int my_png_write_image(png_structp png_ptr, png_infop info_ptr,
-                              png_bytepp row_pointers, const screenshot_t *s)
-{
-    my_png_error *err = png_get_error_ptr(png_ptr);
-
-    if (setjmp(err->setjmp_buffer))
-        return Q_ERR_LIBRARY_ERROR;
-
-    png_init_io(png_ptr, s->fp);
-    png_set_IHDR(png_ptr, info_ptr, s->width, s->height, 8, PNG_COLOR_TYPE_RGB,
-                 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-    png_set_compression_level(png_ptr, Q_clip(s->param, 0, 9));
-    png_set_rows(png_ptr, info_ptr, row_pointers);
-    png_write_png(png_ptr, info_ptr, s->bpp == 4 ? PNG_TRANSFORM_STRIP_FILLER_AFTER : 0, NULL);
-    return Q_ERR_SUCCESS;
+    Com_SetLastError("stb_image_write: JPEG write failed");
+    return Q_ERR_LIBRARY_ERROR;
 }
 
 static int IMG_SavePNG(const screenshot_t *s)
 {
-    png_structp png_ptr;
-    png_infop info_ptr;
-    png_bytepp row_pointers;
-    my_png_error my_err;
-    int i, ret;
+    stbi_flip_vertically_on_write(1);
+    int ret = stbi_write_png_to_func(stbi_write_cb, (void *)s,
+                                     s->width, s->height, s->bpp,
+                                     s->pixels, s->rowbytes);
+    if (ret)
+        return Q_ERR_SUCCESS;
 
-    my_err.filename = s->async ? NULL : s->filename;
-    png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                                      (png_voidp)&my_err, my_png_error_fn, my_png_warning_fn);
-    if (!png_ptr) {
-        if (!s->async)
-            Com_SetLastError("png_create_write_struct failed");
-        return Q_ERR_LIBRARY_ERROR;
-    }
-
-    info_ptr = png_create_info_struct(png_ptr);
-    if (!info_ptr) {
-        ret = Q_ERR_FAILURE;
-        goto fail;
-    }
-
-    row_pointers = malloc(sizeof(png_bytep) * s->height);
-    if (!row_pointers) {
-        ret = Q_ERR(ENOMEM);
-        goto fail;
-    }
-
-    for (i = 0; i < s->height; i++)
-        row_pointers[i] = (png_bytep)(s->pixels + (s->height - i - 1) * s->rowbytes);
-
-    ret = my_png_write_image(png_ptr, info_ptr, row_pointers, s);
-    free(row_pointers);
-fail:
-    png_destroy_write_struct(&png_ptr, &info_ptr);
-    return ret;
+    Com_SetLastError("stb_image_write: PNG write failed");
+    return Q_ERR_LIBRARY_ERROR;
 }
-
-#endif // USE_PNG
 
 /*
 =========================================================
@@ -1153,18 +842,11 @@ SCREEN SHOTS
 =========================================================
 */
 
-#if USE_JPG || USE_PNG
 static cvar_t *r_screenshot_format;
 static cvar_t *r_screenshot_async;
-#endif
-#if USE_JPG
 static cvar_t *r_screenshot_quality;
-#endif
-#if USE_PNG
 static cvar_t *r_screenshot_compression;
-#endif
 
-#if USE_TGA || USE_JPG || USE_PNG
 static cvar_t *r_screenshot_template;
 
 static int suffix_pos(const char *s, int ch)
@@ -1323,7 +1005,7 @@ static void make_screenshot(const char *name, const char *ext,
     }
 }
 
-#endif // USE_TGA || USE_JPG || USE_PNG
+
 
 /*
 ==================
@@ -1337,7 +1019,6 @@ if no formats are available.
 */
 static void IMG_ScreenShot_f(void)
 {
-#if USE_JPG || USE_PNG
     const char *s;
 
     if (Cmd_Argc() > 2) {
@@ -1349,25 +1030,20 @@ static void IMG_ScreenShot_f(void)
         s = Cmd_Argv(1);
     else
         s = r_screenshot_format->string;
-#endif
 
-#if USE_JPG
     if (*s == 'j') {
         make_screenshot(NULL, ".jpg", IMG_SaveJPG,
                         r_screenshot_async->integer > 1,
                         r_screenshot_quality->integer);
         return;
     }
-#endif
 
-#if USE_PNG
     if (*s == 'p') {
         make_screenshot(NULL, ".png", IMG_SavePNG,
                         r_screenshot_async->integer > 0,
                         r_screenshot_compression->integer);
         return;
     }
-#endif
 
 #if USE_TGA
     make_screenshot(NULL, ".tga", IMG_SaveTGA, false, 0);
@@ -1397,7 +1073,6 @@ static void IMG_ScreenShotTGA_f(void)
 }
 #endif
 
-#if USE_JPG
 static void IMG_ScreenShotJPG_f(void)
 {
     int quality;
@@ -1415,9 +1090,7 @@ static void IMG_ScreenShotJPG_f(void)
     make_screenshot(Cmd_Argv(1), ".jpg", IMG_SaveJPG,
                     r_screenshot_async->integer > 1, quality);
 }
-#endif
 
-#if USE_PNG
 static void IMG_ScreenShotPNG_f(void)
 {
     int compression;
@@ -1435,7 +1108,6 @@ static void IMG_ScreenShotPNG_f(void)
     make_screenshot(Cmd_Argv(1), ".png", IMG_SavePNG,
                     r_screenshot_async->integer > 0, compression);
 }
-#endif
 
 /*
 =========================================================
@@ -1463,22 +1135,16 @@ static const struct {
 #if USE_TGA
     { "tga", IMG_LoadTGA },
 #endif
-#if USE_JPG
     { "jpg", IMG_LoadJPG },
-#endif
-#if USE_PNG
     { "png", IMG_LoadPNG }
-#endif
 };
 
-#if USE_PNG || USE_JPG || USE_TGA
 static imageformat_t    img_search[IM_MAX];
 static int              img_total;
 
 static cvar_t   *r_override_textures;
 static cvar_t   *r_texture_formats;
 static cvar_t   *r_texture_overrides;
-#endif
 
 static cvar_t   *r_glowmaps;
 
@@ -1656,8 +1322,6 @@ static int try_image_format(imageformat_t fmt, image_t *image, byte **pic)
     return ret < 0 ? ret : fmt;
 }
 
-#if USE_PNG || USE_JPG || USE_TGA
-
 static int try_replace_ext(imageformat_t fmt, image_t *image, byte **pic)
 {
     // replace the extension
@@ -1783,8 +1447,6 @@ static bool need_override_image(imagetype_t type, imageformat_t fmt)
     return r_texture_overrides->integer & (1 << type);
 }
 
-#endif // USE_PNG || USE_JPG || USE_TGA
-
 static void print_error(const char *name, imageflags_t flags, int err)
 {
     const char *msg;
@@ -1820,7 +1482,6 @@ static int load_image_data(image_t *image, imageformat_t fmt, bool need_dimensio
 {
     int ret;
 
-#if USE_PNG || USE_JPG || USE_TGA
     if (fmt == IM_MAX) {
         // unknown extension, but give it a chance to load anyway
         ret = try_other_formats(IM_MAX, image, pic);
@@ -1844,12 +1505,6 @@ static int load_image_data(image_t *image, imageformat_t fmt, bool need_dimensio
     // texture, we need to recover original image dimensions
     if (need_dimensions && fmt <= IM_WAL && ret > IM_WAL)
         get_image_dimensions(fmt, image);
-#else
-    if (fmt == IM_MAX)
-        ret = Q_ERR_INVALID_PATH;
-    else
-        ret = try_image_format(fmt, image, pic);
-#endif
 
     return ret;
 }
@@ -2225,12 +1880,8 @@ static const cmdreg_t img_cmd[] = {
 #if USE_TGA
     { "screenshottga", IMG_ScreenShotTGA_f },
 #endif
-#if USE_JPG
     { "screenshotjpg", IMG_ScreenShotJPG_f },
-#endif
-#if USE_PNG
     { "screenshotpng", IMG_ScreenShotPNG_f },
-#endif
 
     { NULL }
 };
@@ -2241,29 +1892,17 @@ void IMG_Init(void)
 
     Q_assert(!r_numImages);
 
-#if USE_PNG || USE_JPG || USE_TGA
     r_override_textures = Cvar_Get("r_override_textures", "1", CVAR_FILES);
     r_texture_formats = Cvar_Get("r_texture_formats", R_TEXTURE_FORMATS, 0);
     r_texture_formats->changed = r_texture_formats_changed;
     r_texture_formats_changed(r_texture_formats);
     r_texture_overrides = Cvar_Get("r_texture_overrides", "-1", CVAR_FILES);
 
-#if USE_JPG
     r_screenshot_format = Cvar_Get("gl_screenshot_format", "jpg", 0);
-#elif USE_PNG
-    r_screenshot_format = Cvar_Get("gl_screenshot_format", "png", 0);
-#endif
-#if USE_JPG || USE_PNG
     r_screenshot_async = Cvar_Get("gl_screenshot_async", "1", 0);
-#endif
-#if USE_JPG
     r_screenshot_quality = Cvar_Get("gl_screenshot_quality", "90", 0);
-#endif
-#if USE_PNG
     r_screenshot_compression = Cvar_Get("gl_screenshot_compression", "6", 0);
-#endif
     r_screenshot_template = Cvar_Get("gl_screenshot_template", "quakeXXX", 0);
-#endif // USE_PNG || USE_JPG || USE_TGA
 
     r_glowmaps = Cvar_Get("r_glowmaps", "1", CVAR_FILES);
 

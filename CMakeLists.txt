@@ -66,8 +66,6 @@ option(Q2PRO_GAME_ABI_HACK       "x86 Linux game ABI compatibility hack"        
 
 # Dependency toggles: AUTO / ON / OFF
 set(Q2PRO_USE_ZLIB    "AUTO" CACHE STRING "zlib support (AUTO/ON/OFF)")
-set(Q2PRO_USE_PNG     "AUTO" CACHE STRING "libpng support (AUTO/ON/OFF)")
-set(Q2PRO_USE_JPEG    "AUTO" CACHE STRING "libjpeg-turbo support (AUTO/ON/OFF)")
 set(Q2PRO_USE_CURL    "AUTO" CACHE STRING "libcurl support (AUTO/ON/OFF)")
 set(Q2PRO_USE_SDL2    "AUTO" CACHE STRING "SDL2 support (AUTO/ON/OFF)")
 set(Q2PRO_USE_OPENAL  "AUTO" CACHE STRING "OpenAL support (AUTO/ON/OFF)")
@@ -196,6 +194,12 @@ else()
     set(Q2PRO_HOMEDIR_CFG "")
     set(Q2PRO_HAS_SYSTEM_PATHS OFF)
 endif()
+
+# ---------------------------------------------------------------------------
+# External libraries
+# ---------------------------------------------------------------------------
+add_library(stb INTERFACE)
+target_include_directories(stb SYSTEM INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/extern/stb)
 
 # ---------------------------------------------------------------------------
 # Source tree

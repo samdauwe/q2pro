@@ -46,12 +46,8 @@ typedef enum {
 #if USE_TGA
     IM_TGA,
 #endif
-#if USE_JPG
     IM_JPG,
-#endif
-#if USE_PNG
     IM_PNG,
-#endif
     IM_MAX
 } imageformat_t;
 

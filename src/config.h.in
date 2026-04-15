@@ -24,8 +24,6 @@
 #define DEFGLPROFILE "@Q2PRO_DEFGLPROFILE@"
 
 #cmakedefine USE_ZLIB @USE_ZLIB@
-#cmakedefine USE_PNG @USE_PNG@
-#cmakedefine USE_JPG @USE_JPG@
 #cmakedefine USE_CURL @USE_CURL@
 #cmakedefine USE_OPENAL @USE_OPENAL@
 #cmakedefine USE_AVCODEC @USE_AVCODEC@
